@@ -1,17 +1,23 @@
-const CACHE_NAME = "drug-search-cache-v1";
-const URLS_TO_CACHE = [
-    "index.html",
-    "app.js"
+const CACHE_NAME = "drug-cache-v1";
+const urlsToCache = [
+  "/",
+  "/index.html"
 ];
 
+// Install Service Worker
 self.addEventListener("install", event => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
-    );
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(urlsToCache);
+    })
+  );
 });
 
+// Fetch Cached Data
 self.addEventListener("fetch", event => {
-    event.respondWith(
-        caches.match(event.request).then(response => response || fetch(event.request))
-    );
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request);
+    })
+  );
 });
