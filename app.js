@@ -21,7 +21,7 @@ function openDB() {
     });
 }
 
-// Save data to IndexedDB
+// Save drug details to IndexedDB
 async function saveToDB(data) {
     let db = await openDB();
     let tx = db.transaction(storeName, "readwrite");
@@ -29,28 +29,32 @@ async function saveToDB(data) {
     data.forEach(item => store.put({ name: item[0], details: item }));
 }
 
-// Load drug names from IndexedDB
+// Load all drugs from IndexedDB
 async function loadFromDB() {
     let db = await openDB();
     let tx = db.transaction(storeName, "readonly");
     let store = tx.objectStore(storeName);
     return new Promise((resolve) => {
         let request = store.getAll();
-        request.onsuccess = () => resolve(request.result.map(drug => drug.name));
+        request.onsuccess = () => resolve(request.result);
     });
 }
+
+// Fetch Google Apps Script URL dynamically
+const GAS_URL = document.getElementById("gas_url").value;  // Ensure this input is in your HTML
 
 // Fetch drug names from GAS or IndexedDB
 async function loadDrugNames() {
     if (navigator.onLine) {
-        fetch("https://script.google.com/macros/s/AKfycbwe3o5TOihj-GZhVEe1pCDbFZjnbz4dapJMcBgxyC50W161UmbBQLWpLyUbZ5igUxws/exec?action=getNames")
+        fetch(`${GAS_URL}?action=getNames`)
             .then(response => response.json())
             .then(data => {
-                saveToDB(data);
-                allDrugs = data.map(drug => drug[0]); // Extract names
+                saveToDB(data.map(drug => [drug])); // Store names
+                allDrugs = data;
             });
     } else {
-        allDrugs = await loadFromDB();
+        let drugs = await loadFromDB();
+        allDrugs = drugs.map(d => d.name);
     }
 }
 
@@ -76,9 +80,12 @@ function searchDrug() {
 // Fetch drug details
 function fetchDrugDetails(drug) {
     if (navigator.onLine) {
-        fetch(`https://script.google.com/macros/s/AKfycbwe3o5TOihj-GZhVEe1pCDbFZjnbz4dapJMcBgxyC50W161UmbBQLWpLyUbZ5igUxws/exec?action=getDetails&drug=${drug}`)
+        fetch(`${GAS_URL}?action=getDetails&drug=${drug}`)
             .then(response => response.json())
-            .then(displayResult);
+            .then(data => {
+                saveToDB([[drug, ...data]]); // Store details
+                displayResult(data);
+            });
     } else {
         loadFromDB().then(data => {
             let result = data.find(d => d.name.toLowerCase() === drug.toLowerCase());
