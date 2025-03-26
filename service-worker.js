@@ -1,23 +1,20 @@
-const CACHE_NAME = "drug-cache-v1";
-const urlsToCache = [
-  "/",
-  "/index.html"
+const CACHE_NAME = "pwa-cache-v1";
+const URLS_TO_CACHE = [
+    "/",
+    "/index.html",
+    "/app.js",
+    "/service-worker.js"
 ];
 
-// Install Service Worker
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache);
-    })
-  );
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(URLS_TO_CACHE))
+    );
 });
 
-// Fetch Cached Data
 self.addEventListener("fetch", event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
-  );
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request))
+    );
 });
