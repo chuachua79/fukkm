@@ -1,18 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Medicine Database</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drug Information PWA</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script defer src="app.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Medicine Database</h1>
-    <input type="text" id="searchInput" placeholder="Enter Generic Name">
-    <button id="searchBtn">Search</button>
-    <div id="results"></div>
-  </div>
-  <script src="app.js"></script>
+  <h1>Drug Information Search</h1>
+  <input type="text" id="search" placeholder="Enter Generic Name">
+  <button onclick="searchDrug()">Search</button>
+  <div id="result"></div>
 </body>
 </html>
+
