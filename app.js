@@ -92,8 +92,15 @@ function displayData(row) {
     });
 }
 
-// Attach Search Event
-document.getElementById("searchBox").addEventListener("input", event => {
-    search(event.target.value);
+document.addEventListener("DOMContentLoaded", () => {
+    const searchBox = document.getElementById("searchBox");
+    if (searchBox) {
+        searchBox.addEventListener("input", event => {
+            search(event.target.value);
+        });
+    } else {
+        console.error("Error: #searchBox element not found in HTML.");
+    }
 });
+
 
