@@ -1,111 +1,69 @@
-// Check if browser supports service workers
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
-}
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxIA4NATK_KkNcgeqIZx9S_WCbJVbUQ2HYc1PgEvufUFyGHQ0PiIlAwvafgNSxOuP1p/exec";
 
-// Open IndexedDB
-const dbName = "DrugDB";
-const storeName = "Drugs";
+// IndexedDB setup
+let db;
+const request = indexedDB.open("PWAData", 1);
+request.onupgradeneeded = event => {
+    db = event.target.result;
+    db.createObjectStore("data", { keyPath: "index" });
+};
+request.onsuccess = event => {
+    db = event.target.result;
+};
 
-function openDB() {
-    return new Promise((resolve, reject) => {
-        let request = indexedDB.open(dbName, 1);
-        request.onupgradeneeded = function (event) {
-            let db = event.target.result;
-            if (!db.objectStoreNames.contains(storeName)) {
-                db.createObjectStore(storeName, { keyPath: "name" });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-// Save drug details to IndexedDB
-async function saveToDB(data) {
-    let db = await openDB();
-    let tx = db.transaction(storeName, "readwrite");
-    let store = tx.objectStore(storeName);
-    data.forEach(item => store.put({ name: item[0], details: item }));
-}
-
-// Load all drugs from IndexedDB
-async function loadFromDB() {
-    let db = await openDB();
-    let tx = db.transaction(storeName, "readonly");
-    let store = tx.objectStore(storeName);
-    return new Promise((resolve) => {
-        let request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-// Fetch Google Apps Script URL dynamically
-const GAS_URL = document.getElementById("gas_url").value;  // Ensure this input is in your HTML
-
-// Fetch drug names from GAS or IndexedDB
-async function loadDrugNames() {
-    if (navigator.onLine) {
-        fetch(`${GAS_URL}?action=getNames`)
-            .then(response => response.json())
-            .then(data => {
-                saveToDB(data.map(drug => [drug])); // Store names
-                allDrugs = data;
-            });
-    } else {
-        let drugs = await loadFromDB();
-        allDrugs = drugs.map(d => d.name);
+// Fetch and store data
+async function fetchData() {
+    try {
+        const response = await fetch(SHEET_URL);
+        const data = await response.json();
+        storeDataInIndexedDB(data);
+        return data;
+    } catch {
+        return getOfflineData();
     }
 }
 
-// Search drug
-function searchDrug() {
-    let input = document.getElementById("search").value.toLowerCase();
-    let suggestions = allDrugs.filter(drug => drug.toLowerCase().includes(input));
-    
-    let suggestionBox = document.getElementById("suggestions");
-    suggestionBox.innerHTML = "";
-    suggestions.forEach(drug => {
-        let div = document.createElement("div");
-        div.innerText = drug;
-        div.onclick = function() {
-            document.getElementById("search").value = drug;
-            suggestionBox.innerHTML = "";
-            fetchDrugDetails(drug);
-        };
-        suggestionBox.appendChild(div);
+function storeDataInIndexedDB(data) {
+    const transaction = db.transaction("data", "readwrite");
+    const store = transaction.objectStore("data");
+    store.clear();
+    data.forEach(row => {
+        store.put({ index: row[0], content: row });
     });
 }
 
-// Fetch drug details
-function fetchDrugDetails(drug) {
-    if (navigator.onLine) {
-        fetch(`${GAS_URL}?action=getDetails&drug=${drug}`)
-            .then(response => response.json())
-            .then(data => {
-                saveToDB([[drug, ...data]]); // Store details
-                displayResult(data);
-            });
-    } else {
-        loadFromDB().then(data => {
-            let result = data.find(d => d.name.toLowerCase() === drug.toLowerCase());
-            displayResult(result ? result.details : []);
-        });
-    }
+function getOfflineData() {
+    return new Promise(resolve => {
+        const transaction = db.transaction("data", "readonly");
+        const store = transaction.objectStore("data");
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.map(entry => entry.content));
+    });
 }
 
-// Display results
-function displayResult(data) {
-    let resultDiv = document.getElementById("result");
-    if (!data || data.length === 0) {
-        resultDiv.innerHTML = "<p>No details found.</p>";
-        return;
-    }
-
-    let headers = ["Generic Name", "Brand", "FUKKM System/Group", "MDC", "NEML", "Method of Purchase", "Category", "Indications", "Prescribing Restrictions", "Dosage", "Adverse Reactions", "Contraindications", "Interactions", "Precautions"];
-    let formattedText = headers.map((header, i) => `<strong>${header}</strong><br>${data[i]}<br><br>`).join("");
-
-    resultDiv.innerHTML = `<div style='font-family: Arial, sans-serif; line-height: 1.5;'>${formattedText}</div>`;
+// Search functionality
+async function search(query) {
+    const data = await fetchData();
+    const results = data.filter(row => row[1].toLowerCase().includes(query.toLowerCase()));
+    displayResults(results);
 }
 
-window.onload = loadDrugNames;
+function displayResults(results) {
+    const resultsList = document.getElementById("searchResults");
+    resultsList.innerHTML = "";
+    results.forEach(row => {
+        const li = document.createElement("li");
+        li.textContent = row[1];
+        li.onclick = () => displayData(row);
+        resultsList.appendChild(li);
+    });
+}
+
+function displayData(row) {
+    const display = document.getElementById("dataDisplay");
+    display.innerHTML = row.map((item, index) => `<p><strong>Column ${index + 1}:</strong> ${item}</p>`).join("<hr>");
+}
+
+document.getElementById("searchBox").addEventListener("input", event => {
+    search(event.target.value);
+});
