@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drug Search</title>
+    <title>Searchable PWA</title>
+    <link rel="manifest" href="manifest.json">
     <script defer src="app.js"></script>
 </head>
 <body>
-    <h2>Drug Search</h2>
-    <input type="text" id="search" placeholder="Enter Generic Name" onkeyup="searchDrug()">
-    <div id="suggestions"></div>
-    <div id="result"></div>
+    <h1>Searchable PWA</h1>
+    <input type="text" id="searchBox" placeholder="Enter name to search">
+    <ul id="searchResults"></ul>
+    <div id="dataDisplay"></div>
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
 </body>
 </html>
