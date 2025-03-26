@@ -1,94 +1,60 @@
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js')
-    .then(registration => console.log('SW registered'))
-    .catch(err => console.log('SW registration failed: ', err));
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzLjhIp3nTTqykzGUozOt3V58svfZxysLqApgc5qLPK2yFc6vKYbHOulk-82dndbwjx/exec"; // Replace with your URL
+
+// Initialize IndexedDB
+const DB_NAME = "DrugDB";
+const STORE_NAME = "Drugs";
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    let request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (event) => {
+      let db = event.target.result;
+      db.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 }
 
-// Cache the data from Google Sheets
-let medicineData = [];
-
-// Fetch data from Google Apps Script URL (replace with your URL)
+// Fetch and store data
 async function fetchData() {
   try {
-    const response = await fetch('https://script.google.com/macros/s/AKfycbyc0Q_Ydn75a4R0GJ0PBtjgAb6SVlnMddgThelHyVaDlWJCBrQ2aj-OinhmW3b5dnSo/exec');
-    medicineData = await response.json();
-    
-    // Store in IndexedDB for offline use
-    if ('indexedDB' in window) {
-      const dbRequest = indexedDB.open('MedicineDB', 1);
-      
-      dbRequest.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('medicines')) {
-          db.createObjectStore('medicines', { keyPath: 'Generic Name' });
-        }
-      };
-      
-      dbRequest.onsuccess = (event) => {
-        const db = event.target.result;
-        const transaction = db.transaction('medicines', 'readwrite');
-        const store = transaction.objectStore('medicines');
-        
-        medicineData.forEach(item => {
-          store.put(item);
-        });
-      };
-    }
+    let response = await fetch(GAS_URL);
+    let data = await response.json();
+
+    let db = await initDB();
+    let tx = db.transaction(STORE_NAME, "readwrite");
+    let store = tx.objectStore(STORE_NAME);
+    store.clear(); // Clear old data
+    store.put(data, "drugData");
   } catch (error) {
-    console.error('Error fetching data:', error);
-    // Try to load from IndexedDB if online fetch fails
-    loadFromIndexedDB();
+    console.log("Failed to fetch online. Using offline data.");
   }
 }
 
-function loadFromIndexedDB() {
-  if ('indexedDB' in window) {
-    const dbRequest = indexedDB.open('MedicineDB', 1);
-    
-    dbRequest.onsuccess = (event) => {
-      const db = event.target.result;
-      const transaction = db.transaction('medicines', 'readonly');
-      const store = transaction.objectStore('medicines');
-      const request = store.getAll();
-      
-      request.onsuccess = () => {
-        medicineData = request.result;
-      };
-    };
-  }
+// Search Function
+async function searchDrug() {
+  let searchInput = document.getElementById("search").value.trim().toLowerCase();
+  if (!searchInput) return;
+
+  let db = await initDB();
+  let tx = db.transaction(STORE_NAME, "readonly");
+  let store = tx.objectStore(STORE_NAME);
+  let request = store.get("drugData");
+
+  request.onsuccess = () => {
+    let data = request.result;
+    let result = data && data[searchInput] ? data[searchInput] : "Not Found";
+    document.getElementById("result").innerHTML = formatResult(result);
+  };
 }
 
-// Search function
-function searchMedicine() {
-  const searchTerm = document.getElementById('searchInput').value.trim();
-  const resultsDiv = document.getElementById('results');
-  
-  if (!searchTerm) {
-    resultsDiv.innerHTML = '<p>Please enter a generic name</p>';
-    return;
-  }
-  
-  const result = medicineData.find(item => 
-    item['Generic Name'].toLowerCase() === searchTerm.toLowerCase()
-  );
-  
-  if (result) {
-    let html = '<div class="medicine-card">';
-    for (const key in result) {
-      if (key !== 'Generic Name' && result[key]) {
-        html += `<p><strong>${key}:</strong> ${result[key]}</p>`;
-      }
-    }
-    html += '</div>';
-    resultsDiv.innerHTML = html;
-  } else {
-    resultsDiv.innerHTML = '<p>No medicine found with that generic name</p>';
-  }
+function formatResult(data) {
+  if (data === "Not Found") return "<p>Drug not found.</p>";
+  return Object.entries(data)
+    .map(([key, value]) => `<p><b>${key}:</b> ${value}</p>`)
+    .join("");
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-  fetchData();
-  document.getElementById('searchBtn').addEventListener('click', searchMedicine);
-});
+// Update data on load
+fetchData();
